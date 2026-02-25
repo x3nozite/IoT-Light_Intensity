@@ -46,7 +46,7 @@ GLOBAL_MQ = queue.Queue()
 
 st.set_page_config(
     page_title="IoT ML Realtime Dashboard — Stable", layout="wide")
-st.title("oT ML Realtime DLight Intensity Dashboard")
+st.title("IoT ML Realtime Light Intensity Dashboard")
 # --------------------------- done before starting worker)if "msg_queue" not in st.session_state:
 # expose the global queue in session_state so UI can read it
 st.session_state.msg_queue = GLOBAL_MQ
