@@ -29,8 +29,11 @@ MODEL_PATH = "model/random_forest_model.pkl"   # put the .pkl in same repo
 
 # timezone GMT+7 helper
 TZ = timezone(timedelta(hours=7))
+
+
 def now_str():
     return datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
+
 
 # ---------------------------
 # module-level queue used by MQTT thread (do NOT replace this with st.session_state inside callbacks)
@@ -41,15 +44,12 @@ GLOBAL_MQ = queue.Queue()
 # Streamlit page setup
 # ---------------------------
 
-st.set_page_config(page_title="IoT ML Realtime Dashboard — Stable", layout="wide")
-st.title("🔥 IoT ML Realtime Dashboard — Stable")
-
-# ---------------------------
-# session_state init (must be done before starting worker)
-# ---------------------------
-if "msg_queue" not in st.session_state:
-    # expose the global queue in session_state so UI can read it
-    st.session_state.msg_queue = GLOBAL_MQ
+st.set_page_config(
+    page_title="IoT ML Realtime Dashboard — Stable", layout="wide")
+st.title("oT ML Realtime DLight Intensity Dashboard")
+# --------------------------- done before starting worker)if "msg_queue" not in st.session_state:
+# expose the global queue in session_state so UI can read it
+st.session_state.msg_queue = GLOBAL_MQ
 
 if "logs" not in st.session_state:
     st.session_state.logs = []         # list of dict rows
@@ -71,6 +71,8 @@ if "mqtt_pubc" not in st.session_state:
 # ---------------------------
 # Load Model (safe)
 # ---------------------------
+
+
 @st.cache_resource
 def load_ml_model(path):
     try:
@@ -81,23 +83,29 @@ def load_ml_model(path):
         st.warning(f"Could not load ML model from {path}: {e}")
         return None
 
+
 if st.session_state.ml_model is None:
     st.session_state.ml_model = load_ml_model(MODEL_PATH)
 if st.session_state.ml_model:
     st.success(f"Model loaded: {MODEL_PATH}")
 else:
-    st.info("No ML model loaded. Upload iot_temp_model.pkl in repo to enable predictions.")
+    st.info(
+        "No ML model loaded. Upload iot_temp_model.pkl in repo to enable predictions.")
 
 # ---------------------------
 # MQTT callbacks (use GLOBAL_MQ, NOT st.session_state inside callbacks)
 # ---------------------------
+
+
 def _on_connect(client, userdata, flags, rc):
     try:
         client.subscribe(TOPIC_SENSOR)
     except Exception:
         pass
     # push connection status into queue
-    GLOBAL_MQ.put({"_type": "status", "connected": (rc == 0), "ts": time.time()})
+    GLOBAL_MQ.put(
+        {"_type": "status", "connected": (rc == 0), "ts": time.time()})
+
 
 def _on_message(client, userdata, msg):
     payload = msg.payload.decode(errors="ignore")
@@ -109,11 +117,14 @@ def _on_message(client, userdata, msg):
         return
 
     # push structured sensor message
-    GLOBAL_MQ.put({"_type": "sensor", "data": data, "ts": time.time(), "topic": msg.topic})
+    GLOBAL_MQ.put({"_type": "sensor", "data": data,
+                  "ts": time.time(), "topic": msg.topic})
 
 # ---------------------------
 # Start MQTT thread (worker)
 # ---------------------------
+
+
 def start_mqtt_thread_once():
     def worker():
         client = mqtt.Client()
@@ -127,7 +138,8 @@ def start_mqtt_thread_once():
                 client.loop_forever()
             except Exception as e:
                 # push error into queue so UI can show it
-                GLOBAL_MQ.put({"_type": "error", "msg": f"MQTT worker error: {e}", "ts": time.time()})
+                GLOBAL_MQ.put(
+                    {"_type": "error", "msg": f"MQTT worker error: {e}", "ts": time.time()})
                 time.sleep(5)  # backoff then retry
 
     if not st.session_state.mqtt_thread_started:
@@ -136,12 +148,15 @@ def start_mqtt_thread_once():
         st.session_state.mqtt_thread_started = True
         time.sleep(0.05)
 
+
 # start thread
 start_mqtt_thread_once()
 
 # ---------------------------
 # Helper Functions
 # ---------------------------
+
+
 def parse_time(timestr):
     try:
         t = datetime.strptime(timestr, "%H:%M:%S")
@@ -149,11 +164,13 @@ def parse_time(timestr):
     except:
         return 0, 0, 0
 
+
 label_mapping = {
     0: "Hemat",
     1: "Normal",
     2: "Boros"
 }
+
 
 def model_predict_label_and_conf(time_str, lumen):
     model = st.session_state.ml_model
@@ -196,7 +213,6 @@ def dummy_predict(time_str, lumen):
         return "Boros", round(conf, 3)
 
     return "N/A", None
-
 
 
 # ---------------------------
@@ -256,7 +272,8 @@ def process_queue():
 
             # z-score on temp using recent window
             anomaly = False
-            lumens = [r["lumen"] for r in st.session_state.logs if r.get("lumen") is not None]
+            lumens = [r["lumen"]
+                      for r in st.session_state.logs if r.get("lumen") is not None]
             window = lumens[-30:] if len(lumens) > 0 else []
             if len(window) >= 5 and p_lumen is not None:
                 mean = float(np.mean(window))
@@ -278,7 +295,7 @@ def process_queue():
             pubc = st.session_state.mqtt_pubc
             try:
                 if label == "Boros":
-                    pubc.publish(TOPIC_OUTPUT, "BOROS", retain=True) 
+                    pubc.publish(TOPIC_OUTPUT, "BOROS", retain=True)
                 elif label == "Hemat":
                     pubc.publish(TOPIC_OUTPUT, "HEMAT", retain=True)
                 elif label == "Normal":
@@ -288,6 +305,7 @@ def process_queue():
             except Exception:
                 pass
     return updated
+
 
 # run once here to pick up immediately available messages
 _ = process_queue()
@@ -349,7 +367,8 @@ with left:
         if st.session_state.logs:
             df_dl = pd.DataFrame(st.session_state.logs)
             csv = df_dl.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV file", data=csv, file_name=f"iot_logs_{int(time.time())}.csv")
+            st.download_button("Download CSV file", data=csv,
+                               file_name=f"iot_logs_{int(time.time())}.csv")
         else:
             st.info("No logs to download")
 
@@ -358,7 +377,8 @@ with right:
     df_plot = pd.DataFrame(st.session_state.logs[-200:])
     if (not df_plot.empty) and {"time", "lumen"}.issubset(df_plot.columns):
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df_plot["time"], y=df_plot["lumen"], mode="lines+markers", name="Lumen (lm)"))
+        fig.add_trace(go.Scatter(
+            x=df_plot["time"], y=df_plot["lumen"], mode="lines+markers", name="Lumen (lm)"))
         fig.update_layout(
             yaxis=dict(title="Lumen (lm)"),
             height=520
@@ -378,7 +398,8 @@ with right:
                     colors.append("blue")
                 else:
                     colors.append("gray")
-        fig.update_traces(marker=dict(size=8, color=colors), selector=dict(mode="lines+markers"))
+        fig.update_traces(marker=dict(size=8, color=colors),
+                          selector=dict(mode="lines+markers"))
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No data yet. Make sure ESP32 publishes to correct topic.")
@@ -392,4 +413,4 @@ with right:
 
 # after UI render, drain queue (so next rerun shows fresh data)
 process_queue()
-
+process_queue()
